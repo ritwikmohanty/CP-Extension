@@ -1,0 +1,419 @@
+/* CP Focus Mode - LeetCode Content Script Styles */
+
+/* 
+ * IMPORTANT: All blocking is done via JavaScript by adding .cp-focus-hidden class
+ * This CSS file only defines the hidden class and UI styles
+ * DO NOT add element selectors with display:none here - it breaks the page!
+ */
+
+/* Hide blocked elements - applied via JavaScript */
+.cp-focus-hidden {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  left: -9999px !important;
+}
+
+/* Focus Mode Indicator */
+#cp-focus-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2147483647;
+  /* Max z-index */
+  background: rgba(20, 20, 25, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #fff;
+  padding: 0;
+  border-radius: 9999px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 4px 20px rgba(0, 0, 0, 0.4);
+  animation: cp-focus-slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  transition: box-shadow 0.2s, transform 0.2s;
+  min-width: 180px;
+}
+
+#cp-focus-indicator:hover {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.2),
+    0 8px 30px rgba(0, 0, 0, 0.5);
+  transform: translateY(-1px);
+}
+
+.cp-focus-indicator-content {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 6px;
+}
+
+.cp-focus-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 100%;
+  cursor: grab;
+  color: #666;
+  transition: color 0.2s;
+}
+
+.cp-focus-drag-handle:hover {
+  color: #fff;
+}
+
+.cp-focus-drag-handle:active {
+  cursor: grabbing;
+}
+
+.cp-focus-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 0 4px;
+}
+
+.cp-focus-dot {
+  width: 6px;
+  height: 6px;
+  background-color: #22c55e;
+  /* Green-500 */
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+  animation: cp-focus-pulse 2s infinite;
+}
+
+.cp-focus-text {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #e5e5e5;
+}
+
+.cp-focus-divider {
+  width: 1px;
+  height: 16px;
+  background-color: rgba(255, 255, 255, 0.15);
+  margin: 0 4px;
+}
+
+.cp-focus-timer {
+  padding: 0 12px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+}
+
+.cp-focus-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cp-focus-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.cp-focus-close:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+@keyframes cp-focus-slide-in {
+  from {
+    transform: translateY(-20px) scale(0.95);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes cp-focus-pulse {
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  }
+
+  70% {
+    opacity: 0.8;
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+  }
+
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+/* Hint Notification - Smaller and less distracting */
+.cp-focus-hint-notification {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2147483647;
+  background: rgba(20, 20, 25, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff;
+  padding: 14px 16px;
+  border-radius: 12px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 6px 24px rgba(0, 0, 0, 0.5);
+  animation: cp-focus-hint-slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 300px;
+  border: 1px solid rgba(255, 215, 0, 0.15);
+}
+
+.cp-focus-hint-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cp-focus-hint-icon-emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 215, 0, 0.1);
+  border-radius: 8px;
+  color: #ffd700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.cp-focus-hint-text {
+  flex: 1;
+}
+
+.cp-focus-hint-text strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #ffd700;
+}
+
+.cp-focus-hint-text p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #b4b4b8;
+}
+
+.cp-focus-hint-dismiss {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: #555;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.cp-focus-hint-dismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.cp-focus-hint-dismiss svg {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes cp-focus-hint-slide-in {
+  from {
+    transform: translateY(40px) scale(0.95);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Hint Icons Container */
+.cp-focus-hint-icons-container {
+  position: fixed;
+  bottom: 80px;
+  right: 16px;
+  z-index: 2147483646;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Hint Icon Button - Smaller and less distracting */
+.cp-focus-hint-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 50%;
+  color: #ffd700;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.15);
+  animation: cp-focus-hint-icon-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  opacity: 0.7;
+}
+
+.cp-focus-hint-icon-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.cp-focus-hint-icon-btn:hover {
+  background: rgba(255, 215, 0, 0.2);
+  border-color: rgba(255, 215, 0, 0.5);
+  transform: scale(1.1);
+  box-shadow: 0 4px 16px rgba(255, 215, 0, 0.25);
+  opacity: 1;
+}
+
+.cp-focus-hint-icon-btn:active {
+  transform: scale(0.95);
+}
+
+.cp-focus-hint-icon-number {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 14px;
+  height: 14px;
+  background: #ffd700;
+  color: #000;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes cp-focus-hint-icon-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Hint Available Notification - Subtle toast */
+.cp-focus-hint-available-notification {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  background: rgba(255, 215, 0, 0.9);
+  color: #000;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 12px rgba(255, 215, 0, 0.3);
+  animation: cp-focus-notification-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cp-focus-hint-available-notification button {
+  background: rgba(0, 0, 0, 0.15);
+  border: none;
+  color: #000;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  transition: all 0.2s;
+}
+
+.cp-focus-hint-available-notification button:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+@keyframes cp-focus-notification-slide-up {
+  from {
+    transform: translateX(-50%) translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Fade out animation */
+.cp-focus-fade-out {
+  animation: cp-focus-fade-out 0.3s ease-out forwards;
+}
+
+@keyframes cp-focus-fade-out {
+  from {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+}
+
+/* Ensure hidden elements don't take up space in flex/grid layouts */
+.cp-focus-hidden+* {
+  margin-left: 0 !important;
+}

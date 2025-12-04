@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Mode - AI Blocked</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Light Theme (Default) */
+            --background: 24 33% 97%;
+            --foreground: 0 0% 10%;
+            --card: 0 0% 100%;
+            --card-foreground: 0 0% 10%;
+            --primary: 0 56% 39%;
+            --primary-foreground: 0 0% 100%;
+            --muted: 22 21% 92%;
+            --muted-foreground: 33 5% 32%;
+            --border: 38 64% 89%;
+            --radius: 0.5rem;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background: 24 10% 10%;
+                --foreground: 60 5% 96%;
+                --card: 12 6% 15%;
+                --card-foreground: 60 5% 96%;
+                --primary: 0 74% 42%;
+                --primary-foreground: 24 33% 97%;
+                --muted: 12 6% 15%;
+                --muted-foreground: 24 6% 83%;
+                --border: 30 6% 25%;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: hsl(var(--background));
+            color: hsl(var(--foreground));
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .container {
+            background-color: hsl(var(--card));
+            color: hsl(var(--card-foreground));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            max-width: 480px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+            animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .icon-wrapper {
+            width: 64px;
+            height: 64px;
+            background-color: hsl(var(--primary) / 0.1);
+            color: hsl(var(--primary));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+        }
+
+        .icon-wrapper svg {
+            width: 32px;
+            height: 32px;
+            stroke-width: 2;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: hsl(var(--muted-foreground));
+            font-size: 15px;
+            margin-bottom: 32px;
+        }
+
+        .timer-card {
+            background-color: hsl(var(--muted) / 0.5);
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) - 2px);
+            padding: 20px;
+            margin-bottom: 32px;
+            display: none;
+            /* Hidden by default */
+        }
+
+        .timer-label {
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: hsl(var(--muted-foreground));
+            margin-bottom: 8px;
+        }
+
+        .timer {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 32px;
+            font-weight: 700;
+            color: hsl(var(--primary));
+            font-variant-numeric: tabular-nums;
+        }
+
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: calc(var(--radius) - 2px);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary {
+            background-color: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border-color: hsl(var(--border));
+            color: hsl(var(--foreground));
+        }
+
+        .btn-outline:hover {
+            background-color: hsl(var(--muted));
+        }
+
+        .quote {
+            margin-top: 32px;
+            font-size: 13px;
+            color: hsl(var(--muted-foreground));
+            font-style: italic;
+            border-top: 1px solid hsl(var(--border));
+            padding-top: 20px;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
+                <path d="M12 12 2.1 12a10.1 10.1 0 0 0 1.9 4.2"></path>
+                <path d="m12 12-4.2 8.1a10.1 10.1 0 0 0 4.2 1.9"></path>
+            </svg>
+        </div>
+
+        <h1>Focus Mode Active</h1>
+        <p class="subtitle">
+            AI assistants are blocked to help you build problem-solving muscle. Trust your own logic.
+        </p>
+
+        <div id="timerSection" class="timer-card">
+            <div class="timer-label">Session Time Remaining</div>
+            <div class="timer" id="sessionTimer">00:00</div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-primary" onclick="goBack()">Return to Problem</button>
+            <button class="btn btn-outline" onclick="toggleFocusMode()">Disable Focus Mode</button>
+        </div>
+
+        <div class="quote">
+            "The only way to learn a new programming language is by writing programs in it."
+        </div>
+    </div>
+
+    <script>
+        function goBack() {
+            history.back();
+        }
+
+        function toggleFocusMode() {
+            chrome.runtime.sendMessage(
+                { type: 'TOGGLE_AI_BLOCKING' },
+                (response) => {
+                    if (response && response.success) {
+                        window.close();
+                    }
+                }
+            );
+        }
+
+        function updateTimer() {
+            try {
+                chrome.runtime.sendMessage(
+                    { type: 'GET_TIMER_STATUS' },
+                    (response) => {
+                        if (response && response.currentProblem) {
+                            const timerSection = document.getElementById('timerSection');
+                            timerSection.style.display = 'block';
+
+                            const timeRemaining = response.sessionTimeRemaining || 0;
+                            const mins = Math.floor(timeRemaining / 60);
+                            const secs = timeRemaining % 60;
+                            document.getElementById('sessionTimer').textContent =
+                                `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                        }
+                    }
+                );
+            } catch (error) {
+                console.error('Timer update error:', error);
+            }
+        }
+
+        updateTimer();
+        setInterval(updateTimer, 1000);
+    </script>
+</body>
+
+</html>

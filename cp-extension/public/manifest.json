@@ -1,0 +1,96 @@
+{
+  "manifest_version": 3,
+  "name": "CP Focus Mode",
+  "version": "1.0.0",
+  "description": "Focus on competitive programming by blocking distractions like AI, solutions, discussions, and editorials on coding platforms",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://leetcode.com/*",
+    "https://www.leetcode.com/*",
+    "http://localhost:3000/*",
+    "https://localhost:3000/*",
+    "https://chatgpt.com/*",
+    "https://www.chatgpt.com/*",
+    "https://openai.com/*",
+    "https://www.openai.com/*",
+    "https://gemini.google.com/*",
+    "https://claude.ai/*",
+    "https://www.claude.ai/*",
+    "https://perplexity.ai/*",
+    "https://www.perplexity.ai/*",
+    "https://bing.com/*",
+    "https://www.bing.com/*",
+    "https://copilot.microsoft.com/*",
+    "https://www.copilot.microsoft.com/*",
+    "https://cohere.com/*",
+    "https://www.cohere.com/*",
+    "https://huggingface.co/*",
+    "https://www.huggingface.co/*",
+    "https://poe.com/*",
+    "https://www.poe.com/*",
+    "https://stack-ai.com/*",
+    "https://www.stack-ai.com/*"
+  ],
+  "action": {
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://leetcode.com/*", "https://www.leetcode.com/*"],
+      "js": ["content-scripts/leetcode.js"],
+      "css": ["content-scripts/leetcode.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://www.chatgpt.com/*",
+        "https://openai.com/*",
+        "https://www.openai.com/*",
+        "https://gemini.google.com/*",
+        "https://claude.ai/*",
+        "https://www.claude.ai/*",
+        "https://perplexity.ai/*",
+        "https://www.perplexity.ai/*",
+        "https://bing.com/*",
+        "https://www.bing.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.copilot.microsoft.com/*",
+        "https://cohere.com/*",
+        "https://www.cohere.com/*",
+        "https://huggingface.co/*",
+        "https://www.huggingface.co/*",
+        "https://poe.com/*",
+        "https://www.poe.com/*",
+        "https://stack-ai.com/*",
+        "https://www.stack-ai.com/*"
+      ],
+      "js": ["content-scripts/ai-blocker.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*", "ai-blocked.html"],
+      "matches": ["https://leetcode.com/*", "https://www.leetcode.com/*", "https://*/*"]
+    }
+  ]
+}
