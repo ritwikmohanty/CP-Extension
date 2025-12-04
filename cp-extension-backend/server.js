@@ -1,52 +1,55 @@
 /**
  * CP Focus Mode Backend Server
- * Generates and caches hints for LeetCode problems using Gemini AI
+ * Generates and caches hints for LeetCode problems using Gemini AI + MongoDB
  */
 
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const mongoose = require('mongoose');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const fs = require('fs');
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/cp-focus-hints';
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Middleware
-app.use(cors());
+// Connect to MongoDB
+mongoose.connect(MONGODB_URI).catch(err => {
+  console.error('MongoDB connection failed:', err.message);
+  console.error('Make sure MongoDB is running: mongod');
+});
+
+// Define Hints Schema
+const hintsSchema = new mongoose.Schema({
+  titleSlug: { type: String, unique: true, required: true },
+  title: String,
+  difficulty: String,
+  hints: [String],
+  generatedAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const Hints = mongoose.model('Hints', hintsSchema);
+
+// CORS configuration - handle Private Network Access (PNA) preflight
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Private-Network', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
+
 app.use(express.json({ limit: '10mb' }));
-
-// Cache file path
-const CACHE_FILE = path.join(__dirname, 'hints_cache.json');
-
-// Load cache from file
-function loadCache() {
-  try {
-    if (fs.existsSync(CACHE_FILE)) {
-      const data = fs.readFileSync(CACHE_FILE, 'utf8');
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error('Error loading cache:', error);
-  }
-  return {};
-}
-
-// Save cache to file
-function saveCache(cache) {
-  try {
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2));
-  } catch (error) {
-    console.error('Error saving cache:', error);
-  }
-}
-
-// In-memory cache (loaded from file on startup)
-let hintsCache = loadCache();
 
 /**
  * Generate hints using Gemini AI
@@ -139,13 +142,13 @@ app.post('/api/hints', async (req, res) => {
       return res.status(400).json({ error: 'titleSlug is required' });
     }
 
-    // Check cache first
-    if (hintsCache[titleSlug]) {
-      console.log(`Cache hit for: ${titleSlug}`);
+    // Check MongoDB cache first
+    let cachedRecord = await Hints.findOne({ titleSlug });
+    if (cachedRecord) {
       return res.json({
-        hints: hintsCache[titleSlug].hints,
+        hints: cachedRecord.hints,
         cached: true,
-        generatedAt: hintsCache[titleSlug].generatedAt
+        generatedAt: cachedRecord.generatedAt
       });
     }
 
@@ -157,31 +160,27 @@ app.post('/api/hints', async (req, res) => {
       });
     }
 
-    console.log(`Generating hints for: ${titleSlug}`);
-    
     // Generate new hints
     const hints = await generateHints(problemData);
     
-    // Cache the hints
-    hintsCache[titleSlug] = {
-      hints,
-      generatedAt: new Date().toISOString(),
+    // Save to MongoDB
+    const newRecord = new Hints({
+      titleSlug,
       title: problemData.title,
-      difficulty: problemData.difficulty
-    };
+      difficulty: problemData.difficulty,
+      hints,
+      generatedAt: new Date()
+    });
     
-    // Save to file
-    saveCache(hintsCache);
-    console.log(`Hints cached for ${titleSlug}. Total cached problems: ${Object.keys(hintsCache).length}`);
+    await newRecord.save();
     
     res.json({
       hints,
       cached: false,
-      generatedAt: hintsCache[titleSlug].generatedAt
+      generatedAt: newRecord.generatedAt
     });
 
   } catch (error) {
-    console.error('Error generating hints:', error);
     res.status(500).json({ 
       error: 'Failed to generate hints',
       message: error.message
@@ -193,38 +192,49 @@ app.post('/api/hints', async (req, res) => {
  * GET /api/hints/:titleSlug
  * Get cached hints for a problem (if available)
  */
-app.get('/api/hints/:titleSlug', (req, res) => {
-  const { titleSlug } = req.params;
-  
-  if (hintsCache[titleSlug]) {
-    return res.json({
-      hints: hintsCache[titleSlug].hints,
-      cached: true,
-      generatedAt: hintsCache[titleSlug].generatedAt
+app.get('/api/hints/:titleSlug', async (req, res) => {
+  try {
+    const { titleSlug } = req.params;
+    
+    const record = await Hints.findOne({ titleSlug });
+    if (record) {
+      return res.json({
+        hints: record.hints,
+        cached: true,
+        generatedAt: record.generatedAt
+      });
+    }
+    
+    res.status(404).json({ 
+      error: 'Hints not found for this problem',
+      cached: false
     });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error', message: error.message });
   }
-  
-  res.status(404).json({ 
-    error: 'Hints not found for this problem',
-    cached: false
-  });
 });
 
 /**
  * GET /api/stats
  * Get cache statistics
  */
-app.get('/api/stats', (req, res) => {
-  const problemCount = Object.keys(hintsCache).length;
-  res.json({
-    cachedProblems: problemCount,
-    problems: Object.keys(hintsCache).map(slug => ({
-      slug,
-      title: hintsCache[slug].title,
-      difficulty: hintsCache[slug].difficulty,
-      generatedAt: hintsCache[slug].generatedAt
-    }))
-  });
+app.get('/api/stats', async (req, res) => {
+  try {
+    const totalProblems = await Hints.countDocuments();
+    const problems = await Hints.find({}, { titleSlug: 1, title: 1, difficulty: 1, generatedAt: 1 });
+    
+    res.json({
+      cachedProblems: totalProblems,
+      problems: problems.map(p => ({
+        slug: p.titleSlug,
+        title: p.title,
+        difficulty: p.difficulty,
+        generatedAt: p.generatedAt
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error', message: error.message });
+  }
 });
 
 /**
@@ -233,13 +243,17 @@ app.get('/api/stats', (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
-    timestamp: new Date().toISOString(),
-    cachedProblems: Object.keys(hintsCache).length
+    timestamp: new Date().toISOString()
   });
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`CP Focus Backend running on port ${PORT}`);
-  console.log(`Cached problems: ${Object.keys(hintsCache).length}`);
+app.listen(PORT, async () => {
+  // Wait for MongoDB connection
+  if (mongoose.connection.readyState === 1) {
+    const count = await Hints.countDocuments();
+    console.log(`CP Focus Backend running on port ${PORT} with MongoDB`);
+  } else {
+    console.log(`CP Focus Backend running on port ${PORT} (MongoDB connecting...)`);
+  }
 });
