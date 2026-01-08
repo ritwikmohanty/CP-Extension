@@ -101,6 +101,130 @@
     }
   }
 
+  async function fetchUserStatus() {
+      const userQuery = `
+          query globalData {
+              userStatus {
+                  username
+                  isSignedIn
+              }
+          }
+      `;
+      const response = await fetch('https://leetcode.com/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: userQuery })
+      });
+      const userData = await response.json();
+      return userData.data?.userStatus?.username || null;
+  }
+
+  /**
+   * Helper to get cookie by name
+   */
+  function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+  }
+
+  /**
+   * Fetch all user submissions (question progress) using GraphQL
+   * Iterates through pages to get ALL submissions/questions
+   */
+  async function fetchAllSubmissions() {
+    const query = `
+      query userProgressQuestionList($filters: UserProgressQuestionListInput) {
+        userProgressQuestionList(filters: $filters) {
+          totalNum
+          questions {
+            translatedTitle
+            frontendId
+            title
+            titleSlug
+            difficulty
+            lastSubmittedAt
+            numSubmitted
+            questionStatus
+            lastResult
+            topicTags {
+              name
+              nameTranslated
+              slug
+            }
+          }
+        }
+      }
+    `;
+
+    let allQuestions = [];
+    let skip = 0;
+    const limit = 50;
+    let hasMore = true;
+
+    try {
+      const csrfToken = getCookie('csrftoken');
+      
+      while (hasMore) {
+        // console.log(`Fetching submissions: skip=${skip}, limit=${limit}`);
+        
+        const response = await fetch('https://leetcode.com/graphql/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-csrftoken': csrfToken || ''
+          },
+          body: JSON.stringify({
+            query,
+            variables: { 
+              filters: { 
+                skip, 
+                limit 
+              } 
+            },
+            operationName: "userProgressQuestionList"
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const result = data.data?.userProgressQuestionList;
+
+        if (!result) {
+          break;
+        }
+
+        const { totalNum, questions } = result;
+        
+        if (questions && questions.length > 0) {
+          allQuestions = [...allQuestions, ...questions];
+          skip += questions.length;
+          
+          // If we've fetched all or no more questions returned
+          if (allQuestions.length >= totalNum || questions.length < limit) {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+
+        // Add a small delay to be nice to the server
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      // console.log(`Fetched total ${allQuestions.length} submissions`);
+      return allQuestions;
+
+    } catch (error) {
+      console.error("Error fetching submissions:", error);
+      throw error;
+    }
+  }
+
   /**
    * Fetch hints from backend via background script (avoids CORS/PNA issues)
    */
@@ -478,6 +602,14 @@
         hideElement(el);
       }
     });
+
+    // Block pill-style Hint buttons (header tags)
+    document.querySelectorAll('.rounded-full.bg-fill-secondary').forEach(el => {
+      const text = el.textContent?.trim() || '';
+      if (text.includes('Hint')) {
+        hideElement(el);
+      }
+    });
   }
 
   // Block Topics/Tags
@@ -492,6 +624,14 @@
 
     // Block topic tags
     document.querySelectorAll('[class*="topic-tag"], [href*="/tag/"]').forEach(hideElement);
+
+    // Block pill-style Topic/Company buttons (header tags)
+    document.querySelectorAll('.rounded-full.bg-fill-secondary').forEach(el => {
+      const text = el.textContent?.trim() || '';
+      if (text.includes('Topics') || text.includes('Companies')) {
+        hideElement(el);
+      }
+    });
   }
 
   // Block AI elements - Enhanced to block all AI applications
@@ -550,6 +690,121 @@
         }
       }
     });
+  }
+
+  // Display the Problem Rating
+  function displayProblemRating() {
+      // Find the difficulty tag (using common classes for difficulty)
+      const difficulties = ['Easy', 'Medium', 'Hard'];
+      let difficultyTag = null;
+      
+      // Try finding by text content match in known difficulty classes
+      const possibleTags = document.querySelectorAll('.text-difficulty-easy, .text-difficulty-medium, .text-difficulty-hard');
+      possibleTags.forEach(tag => {
+          if (difficulties.includes(tag.textContent)) {
+              difficultyTag = tag;
+          }
+      });
+
+      if (!difficultyTag) return;
+
+      // Check if we already injected the rating
+      const container = difficultyTag.closest('.flex'); // The parent container
+      if (!container || container.querySelector('.cp-rating-tag')) return;
+
+      const titleSlug = getCurrentProblemId();
+      if (!titleSlug) return;
+
+      // Ask background for rating
+      chrome.runtime.sendMessage({ 
+          type: 'GET_PROBLEM_RATING', 
+          titleSlug: titleSlug 
+      }, (response) => {
+          if (response && response.rating) {
+              // Double check if injected while waiting
+              if (container.querySelector('.cp-rating-tag')) return;
+
+              // Create rating tag
+              const ratingTag = document.createElement('div');
+              ratingTag.className = 'cp-rating-tag relative inline-flex items-center justify-center text-caption px-2 py-1 gap-1 rounded-full bg-fill-secondary text-text-secondary';
+              ratingTag.style.marginLeft = '4px';
+              // ratingTag.style.fontWeight = '500';
+              ratingTag.textContent = `Rating: ${response.rating}`;
+              
+              // Insert after the difficulty tag
+              difficultyTag.insertAdjacentElement('afterend', ratingTag);
+          }
+      });
+  }
+
+  // Display Ratings on Problem Set Page
+  function displayProblemSetRatings() {
+      // Find all problem rows in the list
+      // Targeting the specific structure provided: 
+      // <a href="/problems/..." ...> ... <p ...>Hard</p> ... </a>
+      
+      const problemRows = document.querySelectorAll('a[href*="/problems/"]');
+      const slugsToFetch = [];
+      const rowsToUpdate = new Map(); // slug -> element to insert after
+
+      problemRows.forEach(row => {
+          // Check if we already added a rating
+          if (row.querySelector('.cp-rating-tag-list')) return;
+
+          // Clean up the href to get slug
+          const href = row.getAttribute('href');
+          const match = href.match(/\/problems\/([^/?]+)/);
+          if (!match) return;
+          const slug = match[1];
+
+          // Find the difficulty text element to insert after
+          // It's usually a <p> tag with text-sd-hard/medium/easy class or containing the text
+          let difficultyEl = row.querySelector('.text-sd-easy, .text-sd-medium, .text-sd-hard');
+          
+          if (!difficultyEl) {
+             // Fallback: try finding by text content
+             const ps = row.querySelectorAll('p');
+             for (const p of ps) {
+                 const text = p.textContent.trim();
+                 if (['Easy', 'Medium', 'Hard'].includes(text)) {
+                     difficultyEl = p;
+                     break;
+                 }
+             }
+          }
+
+          if (difficultyEl) {
+              slugsToFetch.push(slug);
+              // Store the container/place to insert
+              rowsToUpdate.set(slug, difficultyEl);
+          }
+      });
+
+      if (slugsToFetch.length === 0) return;
+
+      // Fetch ratings in batch
+      chrome.runtime.sendMessage({
+          type: 'GET_BATCH_PROBLEM_RATINGS',
+          titleSlugs: slugsToFetch
+      }, (response) => {
+          if (response && response.ratings) {
+              rowsToUpdate.forEach((insertAfterEl, slug) => {
+                  const rating = response.ratings[slug];
+                  if (rating) {
+                      // Double check to avoid duplicates
+                      const row = insertAfterEl.closest('a') || insertAfterEl.closest('.flex');
+                      if (row && row.querySelector('.cp-rating-tag-list')) return;
+
+                      const ratingTag = document.createElement('div');
+                      ratingTag.className = 'cp-rating-tag-list inline-flex items-center justify-center text-caption px-2 py-0.5 mt-0.5 ml-2 rounded-full bg-fill-secondary text-text-secondary text-xs font-medium';
+                      ratingTag.textContent = rating;
+                      ratingTag.title = `Problem Rating: ${rating}`;
+                      
+                      insertAfterEl.insertAdjacentElement('afterend', ratingTag);
+                  }
+              });
+          }
+      });
   }
 
   // Create and show the focus mode indicator
@@ -823,6 +1078,8 @@
       clearTimeout(window.cpFocusDebounce);
       window.cpFocusDebounce = setTimeout(() => {
         blockElements();
+        displayProblemRating(); // Check and display rating (single problem)
+        displayProblemSetRatings(); // Check and display list ratings
       }, 100);
     });
 
@@ -903,6 +1160,17 @@
       });
       return true;
     }
+
+
+    if (message.type === 'FETCH_ALL_SUBMISSIONS') {
+      Promise.all([fetchAllSubmissions(), fetchUserStatus()])
+        .then(([submissions, username]) => {
+             if (!username) throw new Error("Not logged in");
+             sendResponse({ success: true, data: { submissions, username } });
+        })
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true; // Keep channel open for async response
+    }
   });
 
   // Initialize the content script
@@ -954,9 +1222,12 @@
 
   // Also run on full page load (for SPAs)
   window.addEventListener('load', () => {
-    if (settings.enabled) {
-      setTimeout(blockElements, 500);
-    }
+    // Always try to display rating even if disabled (or better, make it part of general enhancements)
+    setTimeout(() => {
+        if (settings.enabled) blockElements();
+        displayProblemRating();
+        displayProblemSetRatings();
+    }, 500);
   });
 
   // Listen for URL changes (SPA navigation)
@@ -986,6 +1257,9 @@
         if (settings.enabled) {
           startTimerForProblem();
         }
+        
+        // Re-check rating for new problem
+        setTimeout(displayProblemRating, 1000);
       }
     }
   }).observe(document, { subtree: true, childList: true });

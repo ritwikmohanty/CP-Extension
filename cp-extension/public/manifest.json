@@ -7,8 +7,8 @@
   "host_permissions": [
     "https://leetcode.com/*",
     "https://www.leetcode.com/*",
-    "http://localhost:3000/*",
-    "https://localhost:3000/*",
+    "http://localhost:5000/*",
+    "https://localhost:5000/*",
     "https://chatgpt.com/*",
     "https://www.chatgpt.com/*",
     "https://openai.com/*",
@@ -48,8 +48,7 @@
     {
       "matches": ["https://leetcode.com/*", "https://www.leetcode.com/*"],
       "js": [
-        "content-scripts/leetcode.js",
-        "content-scripts/submission-fetcher.js"
+        "content-scripts/leetcode.js"
       ],
       "css": ["content-scripts/leetcode.css"],
       "run_at": "document_idle"
@@ -88,7 +87,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["icons/*", "ai-blocked.html"],
+      "resources": ["icons/*", "ai-blocked.html", "ratings.txt"],
       "matches": [
         "https://leetcode.com/*",
         "https://www.leetcode.com/*",

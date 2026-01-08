@@ -1,7 +1,7 @@
 // Background service worker for CP Focus Mode Extension
 
 // Backend URL for hint generation
-const BACKEND_URL = 'http://localhost:3000';
+const BACKEND_URL = 'http://localhost:5000';
 
 // Default settings - DISABLED BY DEFAULT
 const DEFAULT_SETTINGS = {
@@ -28,8 +28,40 @@ const DEFAULT_SETTINGS = {
     showFocusIndicator: true // Option to show/hide the focus mode popup
   },
   problemHistory: {}, // Store timing history for each problem
-  problemHints: {} // Store extracted hints for each problem
+  problemHints: {}, // Store extracted hints for each problem
+  problemRatings: {} // Cache for problem ratings
 };
+
+// Load ratings on startup
+let ratingMap = new Map();
+
+async function loadRatings() {
+  try {
+    const response = await fetch(chrome.runtime.getURL('ratings.txt'));
+    const text = await response.text();
+    const lines = text.split('\n');
+    
+    // Skip header row
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const parts = line.split('\t');
+        if (parts.length >= 5) {
+            const rating = parseFloat(parts[0]);
+            const slug = parts[4];
+            if (slug && !isNaN(rating)) {
+                ratingMap.set(slug, Math.round(rating)); // Store rounded rating
+            }
+        }
+    }
+    console.log(`Loaded ${ratingMap.size} ratings`);
+  } catch (error) {
+    console.error('Failed to load ratings:', error);
+  }
+}
+
+loadRatings();
 
 // Initialize settings on install
 chrome.runtime.onInstalled.addListener(async () => {
@@ -288,6 +320,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
     return true;
   }
+
+  if (message.type === 'GET_PROBLEM_RATING') {
+      const slug = message.titleSlug;
+      const rating = ratingMap.get(slug);
+      sendResponse({ rating: rating || null });
+      return true;
+  }
+
+  if (message.type === 'GET_BATCH_PROBLEM_RATINGS') {
+    const slugs = message.titleSlugs;
+    const ratings = {};
+    if (Array.isArray(slugs)) {
+      slugs.forEach(slug => {
+        const rating = ratingMap.get(slug);
+        if (rating) {
+          ratings[slug] = rating;
+        }
+      });
+    }
+    sendResponse({ ratings });
+    return true;
+  }
 });
 
 // Helper function to format time
@@ -329,85 +383,36 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 async function fetchAndSyncSubmissions() {
-  let username = null;
-  // 1. Get username
+  // 1. Get active LeetCode tab
+  const tabs = await chrome.tabs.query({ url: ['https://leetcode.com/*', 'https://www.leetcode.com/*'], active: true });
+  if (tabs.length === 0) {
+      throw new Error('Please open LeetCode to sync');
+  }
+  const tabId = tabs[0].id;
+
+  // 2. Request data from content script (which has the cookies/session)
+  let response;
   try {
-      const userQuery = `
-          query globalData {
-              userStatus {
-                  username
-                  isSignedIn
-              }
-          }
-      `;
-      const userRes = await fetch('https://leetcode.com/graphql', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: userQuery })
-      });
-      const userData = await userRes.json();
-      if (userData.data?.userStatus?.isSignedIn) {
-          username = userData.data.userStatus.username;
-      }
+    response = await chrome.tabs.sendMessage(tabId, { type: 'FETCH_ALL_SUBMISSIONS' });
   } catch (e) {
-      console.error('Failed to fetch user status', e);
-      throw new Error('Failed to connect to LeetCode. Are you logged in?');
-  }
-
-  if (!username) {
-    throw new Error('Not logged in to LeetCode');
-  }
-
-  // 2. Fetch submissions
-  const allSubmissionsQuery = `
-    query recentSubmissions($username: String!, $limit: Int!) {
-        recentSubmissionList(username: $username, limit: $limit) {
-            id
-            title
-            titleSlug
-            timestamp
-            statusDisplay
-            lang
-            runtime
-            memory
-            url
-        }
+    console.error("Content script communication error:", e);
+    if (e.message.includes("Receiving end does not exist") || e.message.includes("closed")) {
+        throw new Error("Please refresh the LeetCode page and try again.");
     }
-  `;
-
-  const response = await fetch('https://leetcode.com/graphql', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      query: allSubmissionsQuery,
-      variables: {
-          username: username,
-          limit: 50
-      }
-    })
-  });
+    throw e;
+  }
   
-  const data = await response.json();
-  
-  if (!data.data || !data.data.recentSubmissionList) {
-      throw new Error('Failed to fetch submissions data');
+  if (!response || !response.success) {
+      throw new Error(response?.error || 'Failed to fetch data from page');
   }
 
-  const submissions = data.data.recentSubmissionList.map(sub => ({
-      id: sub.id,
-      title: sub.title,
-      title_slug: sub.titleSlug,
-      timestamp: sub.timestamp,
-      status_display: sub.statusDisplay,
-      lang: sub.lang,
-      runtime: sub.runtime,
-      memory: sub.memory,
-      url: sub.url
-  }));
+  const { submissions, username } = response.data;
+  
+  if (!submissions || submissions.length === 0) {
+      return { success: true, count: 0 };
+  }
 
-  // 3. Send to backend
+  // 3. Send to backend (raw data, as requested)
   try {
     const backendRes = await fetch(`${BACKEND_URL}/api/submissions`, {
         method: 'POST',
@@ -424,6 +429,6 @@ async function fetchAndSyncSubmissions() {
     const result = await backendRes.json();
     return { success: true, count: result.count };
   } catch (e) {
-     throw new Error('Failed to reach backend at localhost:3000');
+     throw new Error('Failed to reach backend at localhost:5000: ' + e.message);
   }
 }

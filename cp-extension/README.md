@@ -120,7 +120,7 @@ Load in Chrome:
 
 Update the backend URL in `public/content-scripts/leetcode.js`:
 ```javascript
-const BACKEND_URL = 'http://localhost:3000'; // or your deployed URL
+const BACKEND_URL = 'http://localhost:5000'; // or your deployed URL
 ```
 
 ## Usage
