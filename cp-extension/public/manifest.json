@@ -3,11 +3,7 @@
   "name": "CP Focus Mode",
   "version": "1.0.0",
   "description": "Focus on competitive programming by blocking distractions like AI, solutions, discussions, and editorials on coding platforms",
-  "permissions": [
-    "storage",
-    "activeTab",
-    "alarms"
-  ],
+  "permissions": ["storage", "activeTab", "alarms"],
   "host_permissions": [
     "https://leetcode.com/*",
     "https://www.leetcode.com/*",
@@ -51,7 +47,10 @@
   "content_scripts": [
     {
       "matches": ["https://leetcode.com/*", "https://www.leetcode.com/*"],
-      "js": ["content-scripts/leetcode.js"],
+      "js": [
+        "content-scripts/leetcode.js",
+        "content-scripts/submission-fetcher.js"
+      ],
       "css": ["content-scripts/leetcode.css"],
       "run_at": "document_idle"
     },
@@ -90,7 +89,11 @@
   "web_accessible_resources": [
     {
       "resources": ["icons/*", "ai-blocked.html"],
-      "matches": ["https://leetcode.com/*", "https://www.leetcode.com/*", "https://*/*"]
+      "matches": [
+        "https://leetcode.com/*",
+        "https://www.leetcode.com/*",
+        "https://*/*"
+      ]
     }
   ]
 }

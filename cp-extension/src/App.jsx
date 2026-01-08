@@ -431,6 +431,19 @@ function App() {
           </CardContent>
         </Card>
 
+        {/* Data Sync Settings */}
+        <Card className={cn("transition-opacity duration-200", !settings.enabled && "opacity-60")}>
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              Data Sync
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+             <SyncButton />
+          </CardContent>
+        </Card>
+
         {/* Hints Section - Only show when on a problem page */}
         {timerStatus.currentProblem && currentHints.hints.length > 0 && (
           <Card className="border-yellow-500/20 bg-yellow-500/5">
@@ -531,3 +544,61 @@ function OptionItem({ icon: Icon, label, checked, onChange, disabled }) {
 }
 
 export default App;
+
+function SyncButton() {
+  const [status, setStatus] = useState('idle'); // idle, syncing, success, error
+  const [msg, setMsg] = useState('');
+
+  const handleSync = async () => {
+    setStatus('syncing');
+    setMsg('');
+    try {
+      if (chrome?.runtime?.sendMessage) {
+        const response = await chrome.runtime.sendMessage({ type: 'SYNC_SUBMISSIONS' });
+        if (response.success) {
+          setStatus('success');
+          setMsg(`Synced ${response.count} items`);
+          setTimeout(() => setStatus('idle'), 3000);
+        } else {
+          setStatus('error');
+          setMsg(response.error || 'Failed');
+        }
+      } else {
+         setStatus('error');
+         setMsg('Extension runtime not found');
+      }
+    } catch (e) {
+      setStatus('error');
+      setMsg('Error: ' + e.message);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">Sync LeetCode Submissions</span>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleSync} 
+          disabled={status === 'syncing'}
+          className="h-7 text-xs"
+        >
+          {status === 'syncing' && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+          {status === 'idle' && 'Sync Now'}
+          {status === 'syncing' && 'Syncing...'}
+          {status === 'success' && 'Synced!'}
+          {status === 'error' && 'Retry'}
+        </Button>
+      </div>
+      {msg && (
+        <p className={cn(
+          "text-[10px]",
+          status === 'error' ? "text-red-500" : "text-green-500"
+        )}>
+          {msg}
+        </p>
+      )}
+    </div>
+  );
+}

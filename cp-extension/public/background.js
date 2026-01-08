@@ -275,6 +275,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
     return true;
   }
+
+
+  if (message.type === 'SYNC_SUBMISSIONS') {
+    (async () => {
+      try {
+        const result = await fetchAndSyncSubmissions();
+        sendResponse(result);
+      } catch (error) {
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
+  }
 });
 
 // Helper function to format time
@@ -314,3 +327,103 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     });
   }
 });
+
+async function fetchAndSyncSubmissions() {
+  let username = null;
+  // 1. Get username
+  try {
+      const userQuery = `
+          query globalData {
+              userStatus {
+                  username
+                  isSignedIn
+              }
+          }
+      `;
+      const userRes = await fetch('https://leetcode.com/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: userQuery })
+      });
+      const userData = await userRes.json();
+      if (userData.data?.userStatus?.isSignedIn) {
+          username = userData.data.userStatus.username;
+      }
+  } catch (e) {
+      console.error('Failed to fetch user status', e);
+      throw new Error('Failed to connect to LeetCode. Are you logged in?');
+  }
+
+  if (!username) {
+    throw new Error('Not logged in to LeetCode');
+  }
+
+  // 2. Fetch submissions
+  const allSubmissionsQuery = `
+    query recentSubmissions($username: String!, $limit: Int!) {
+        recentSubmissionList(username: $username, limit: $limit) {
+            id
+            title
+            titleSlug
+            timestamp
+            statusDisplay
+            lang
+            runtime
+            memory
+            url
+        }
+    }
+  `;
+
+  const response = await fetch('https://leetcode.com/graphql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      query: allSubmissionsQuery,
+      variables: {
+          username: username,
+          limit: 50
+      }
+    })
+  });
+  
+  const data = await response.json();
+  
+  if (!data.data || !data.data.recentSubmissionList) {
+      throw new Error('Failed to fetch submissions data');
+  }
+
+  const submissions = data.data.recentSubmissionList.map(sub => ({
+      id: sub.id,
+      title: sub.title,
+      title_slug: sub.titleSlug,
+      timestamp: sub.timestamp,
+      status_display: sub.statusDisplay,
+      lang: sub.lang,
+      runtime: sub.runtime,
+      memory: sub.memory,
+      url: sub.url
+  }));
+
+  // 3. Send to backend
+  try {
+    const backendRes = await fetch(`${BACKEND_URL}/api/submissions`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ submissions, username })
+    });
+    
+    if (!backendRes.ok) {
+        throw new Error('Backend failed: ' + backendRes.statusText);
+    }
+    
+    const result = await backendRes.json();
+    return { success: true, count: result.count };
+  } catch (e) {
+     throw new Error('Failed to reach backend at localhost:3000');
+  }
+}
